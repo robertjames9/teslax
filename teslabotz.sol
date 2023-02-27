@@ -6,20 +6,19 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Teslabotz is Ownable {
+contract Tesla is Ownable {
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
     IERC20 public token;
     Counters.Counter private dailyLimit;
 
-    uint[] public referRate = [70, 40, 30, 20];
-    uint[] public sameRankReferRate = [0, 5, 5, 10];
-    uint public commissionFeeRate = 180;
-    uint public levelStep = 4;
-    uint private companyFee = 50;
-    uint public poolRate = 20;
-    uint public treasuryRate = 140;
-    uint private techFee = 10;
+    uint[] public commRate = [70, 40, 30, 20]; //referrals commission rate
+    uint[] public sameRankCommRate = [0, 5, 5, 10]; //same rank commission rate
+    uint public commFeeRate = 180; //total commission should be payout
+    uint public levelStep = 4; //total level of membership
+    uint private companyFee = 150; //company earning
+    uint public poolRate = 20; //for sharing prize pool
+    uint public marketingFee = 150; //for marketing purpose
     uint public available;
     uint public price;
     uint public minUnits = 1;
@@ -35,9 +34,8 @@ contract Teslabotz is Ownable {
     uint public totalUsers;
 
     address private companyWallet = 0x7b421084368661260bE1FAD06660940EAd41A50b;
-    address private treasuryWallet = 0x7b421084368661260bE1FAD06660940EAd41A50b;
+    address private marketingWallet = 0x7b421084368661260bE1FAD06660940EAd41A50b;
     address private poolWallet = 0x7b421084368661260bE1FAD06660940EAd41A50b;
-    address private techWallet = 0x7b421084368661260bE1FAD06660940EAd41A50b;
 
     bool started = false;
 
@@ -100,7 +98,7 @@ contract Teslabotz is Ownable {
         }
     }
 
-    function invest(address referer, uint units) external {
+     function invest(address referer, uint units) external {
         require(started, "Investment program haven't start!");
         require(units >= minUnits, "Less than Min Units");
         require(units <= maxUnits, "Over than Max Units");
@@ -111,31 +109,6 @@ contract Teslabotz is Ownable {
         payReferral(referer, units);
         payQueue();
     }
-
-    function claim() external {
-        User storage user = users[userids[msg.sender]];
-        require(user.deposits.length > 0, "User has No Deposits");
-        uint topay;
-        uint i;
-        for (i = 0; i < user.deposits.length; i++) {
-            Deposit storage deposit = deposits[user.deposits[i]];
-            if (deposit.allocated > deposit.payout) {
-                uint onepay = deposit.allocated - deposit.payout;
-                deposit.payout += onepay;
-                user.totalWithdrawn += onepay;
-                totalWithdrawn += onepay;
-                topay += onepay;
-
-            if (deposit.allocated == deposit.payout){
-                user.activate = false;
-            }
-        }
-    }
-        user.disableDeposit = false;
-        require(topay > 0, "No to claim");
-        token.safeTransfer(msg.sender, topay);
-        emit UserMsg(userids[msg.sender], "Claim", topay);
-}
 
     function processDeposit(address referer, uint units) private {
         uint userid = userids[msg.sender];
@@ -182,7 +155,7 @@ contract Teslabotz is Ownable {
 
     function payReferral(address referer, uint units) private returns (uint){
         uint value = price * units;
-        uint currTotalCommission = value * commissionFeeRate / 1000;
+        uint currTotalCommission = value * commFeeRate / 1000;
         uint remainingCommission = currTotalCommission;
         uint totalRefOut;
         uint prevUplineLevel = 0;
@@ -213,9 +186,9 @@ contract Teslabotz is Ownable {
                 sameRankClaimed = false;
             }
             else if(currUplineLevel == prevUplineLevel && !sameRankClaimed && currUplineLevel > 0) {
-                uint sameRankRate = sameRankReferRate[currUplineLevel - 1];
+                uint sameRankRate = sameRankCommRate[currUplineLevel - 1];
                 if (sameRankRate > 0) {
-                    commission = value * sameRankReferRate[i] / 1000;
+                    commission = value * sameRankCommRate[i] / 1000;
                     performTransfer(upline, uplineId, commission);
                     totalRefOut = totalRefOut + commission;
                     remainingCommission = remainingCommission - commission;
@@ -239,13 +212,11 @@ contract Teslabotz is Ownable {
         available -= currTotalCommission;
         uint companyOut = value * companyFee / 1000;
         token.safeTransfer(companyWallet, companyOut);
-        uint treasuryOut = value * treasuryRate / 1000;
-        token.safeTransfer(treasuryWallet, treasuryOut);
+        uint marketingOut = value * marketingFee / 1000;
+        token.safeTransfer(marketingWallet, marketingOut);
         uint poolOut = value * poolRate / 1000;
         token.safeTransfer(poolWallet, poolOut);
-        uint techOut = value * techFee / 1000;
-        token.safeTransfer(techWallet, techOut);
-        uint commi = companyOut + treasuryOut + poolOut + techOut;
+        uint commi = companyOut + marketingOut + poolOut;
         emit Commission(commi);
         available -= commi;
         return commi;
@@ -261,7 +232,7 @@ contract Teslabotz is Ownable {
         if(prevLevel > currLevel)
             return 0;
         for(uint i = prevLevel; i < currLevel; i++) {
-            rateSum = rateSum + referRate[i];
+            rateSum = rateSum + commRate[i];
         }
         return rateSum;
     }
@@ -371,6 +342,31 @@ contract Teslabotz is Ownable {
         }
     }
 
+    function claim() external {
+        User storage user = users[userids[msg.sender]];
+        require(user.deposits.length > 0, "User has No Deposits");
+        uint topay;
+        uint i;
+        for (i = 0; i < user.deposits.length; i++) {
+            Deposit storage deposit = deposits[user.deposits[i]];
+            if (deposit.allocated > deposit.payout) {
+                uint onepay = deposit.allocated - deposit.payout;
+                deposit.payout += onepay;
+                user.totalWithdrawn += onepay;
+                totalWithdrawn += onepay;
+                topay += onepay;
+
+            if (deposit.allocated == deposit.payout){
+                user.activate = false;
+            }
+        }
+    }
+        user.disableDeposit = false;
+        require(topay > 0, "Nothing to claim");
+        token.safeTransfer(msg.sender, topay);
+        emit UserMsg(userids[msg.sender], "Claim", topay);
+}
+
     function resetCount() external onlyOwner {
         dailyLimit.reset();
     }
@@ -407,12 +403,12 @@ contract Teslabotz is Ownable {
         companyWallet = wallet;
     }
 
-    function setReferRate(uint256[] memory rates) external onlyOwner {
-        referRate = rates;
+    function setCommRate(uint256[] memory rates) external onlyOwner {
+        commRate = rates;
     }
 
     function setSRankRate(uint256[] memory rates) external onlyOwner {
-        sameRankReferRate = rates;
+        sameRankCommRate = rates;
     }
 
     function setPayMultiplier(uint multiplier) external onlyOwner {
