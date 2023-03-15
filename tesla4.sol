@@ -25,6 +25,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
     Counters.Counter private _dailyLimit;
 
     uint[] private groupRate = [30, 30, 30, 30, 30]; //group commission rate
+    uint[] private sameRate = [3, 6, 9, 12, 15]; //same rank commission rate
     uint private directCommRate = 100; //direct sponsor commission
     uint private groupFeeRate = 165; //total group commission should be payout
     uint private companyFee = 205; //company earning
@@ -187,9 +188,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
                 sameRank = false;
             }
             else if(currUplineLevel == prevUplineLevel && !sameRank && currUplineLevel > 0) {
-                uint sameRankRate = groupRate[currUplineLevel - 1];
+                uint sameRankRate = sameRate[currUplineLevel - 1];
                 if (sameRankRate > 0) {
-                    commission = price * groupRate[i] / 10000;
+                    commission = price * sameRankRate / 1000;
                     performTransfer(upline, uplineId, commission);
                     totalRefOut += commission;
                     groupCommission -= commission;
