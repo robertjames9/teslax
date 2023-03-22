@@ -478,16 +478,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
         );
     }
 
-    function userInfo(uint userId) public view returns (address, uint, address, Level memory, uint, uint, uint, uint, uint, uint, bool) {
+    function userInfo(uint userId) public view returns (address, uint, address, uint, uint, uint, uint, uint, uint, uint, bool) {
         require(userId > 0 && userId <= totalUsers, "Invalid user ID");
         User storage user = users[userId];
-        Level storage level = levels[userId];
 
         return (
             user.referer,
             userids[user.referer],
             user.account,
-            level,
+            user.level,
             user.partners.length,
             user.totalDeposit,
             user.totalAllocated,
